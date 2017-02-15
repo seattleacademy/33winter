@@ -4,21 +4,23 @@
     var Tracker = function Tracker(cockpit) {
         var tracker = this;
         console.log('Loading Tracker plugin');
+
         this.cockpit = cockpit;
+        $('#controls').append('<input type="button" id="track" value="trackme">');
 
         this.frameWidth = 640;
         this.frameHeight = 360;
 
-        this.newPyramid   = new jsfeat.pyramid_t(3);
-        this.oldPyramid   = new jsfeat.pyramid_t(3);
+        this.newPyramid = new jsfeat.pyramid_t(3);
+        this.oldPyramid = new jsfeat.pyramid_t(3);
         this.point_status = new Uint8Array(1);
-        this.oldXY        = new Float32Array(2);
-        this.newXY        = new Float32Array(2);
-        this.oldRoundedX  = 0;
-        this.oldRoundedY  = 0;
+        this.oldXY = new Float32Array(2);
+        this.newXY = new Float32Array(2);
+        this.oldRoundedX = 0;
+        this.oldRoundedY = 0;
 
-        this.canvas       = document.querySelector('#dronestream canvas');
-        if (! this.canvas) {
+        this.canvas = document.querySelector('#dronestream canvas');
+        if (!this.canvas) {
             console.error('Did not find required dronestream canvas');
             return;
         }
@@ -38,25 +40,53 @@
         $('#cockpit').append('<img id="tracker-crosshairs" src="/plugin/tracker/img/sniper.png">');
         this.crosshairs = $('#tracker-crosshairs').get(0);
         this.crosshairs.style.display = 'none';
-
-        this.on('points', function (data) {
+        var gap = 0;
+        var cCenter = 0;
+        this.on('points', function(data) {
+            //console.log("data", data[0].x, tracker.canvas.clientWidth);
+            var cCenter = tracker.canvas.clientWidth/2;
+            var gap = cCenter/40;
+            var newspeed = Math.abs(cCenter - data[0].x)/cCenter;
+            console.log("speed", newspeed, "gap", gap);
+            if (data[0].x < (cCenter - gap)) {
+                console.log("turn left");
+                tracker.cockpit.socket.emit("/pilot/move", {
+                    action: 'counterClockwise',
+                    speed: newspeed
+                });
+            } else
+            if (data[0].x > cCenter + gap) {
+                console.log("turn right");
+                tracker.cockpit.socket.emit("/pilot/move", {
+                    action: 'clockwise',
+                    speed: newspeed
+                });
+            } else {
+                tracker.cockpit.socket.emit("/pilot/drone", {
+                    action: 'stop'
+                });
+                console.log("don't move");
+            }
             tracker.crosshairs.style.left = (data[0].x - 83) + 'px';
-            tracker.crosshairs.style.top = (data[0].y - 83 ) + 'px';
+            tracker.crosshairs.style.top = (data[0].y - 83) + 'px';
             tracker.crosshairs.style.display = 'block';
         });
 
-        this.on('locked', function () {
+        this.on('locked', function() {
             console.log('target acquired');
         });
 
-        this.on('lost', function () {
+        this.on('lost', function() {
             console.log('target lost');
+            tracker.cockpit.socket.emit("/pilot/drone", {
+                action: 'stop'
+            });
             tracker.crosshairs.style.display = 'none';
             tracker.disable();
         });
     };
 
-    Tracker.prototype.prepareTrackingBuffer = function () {
+    Tracker.prototype.prepareTrackingBuffer = function() {
         this.newPyramid.allocate(
             this.frameWidth,
             this.frameHeight,
@@ -69,7 +99,7 @@
         );
     };
 
-    Tracker.prototype.update = function (frameBuffer) {
+    Tracker.prototype.update = function(frameBuffer) {
         var tmpXY,
             tmpPyramid,
             roundedX,
@@ -96,7 +126,7 @@
                 this.newXY[1] * this.canvas.clientHeight / this.frameHeight
             );
             if (
-                (! this.locked) ||
+                (!this.locked) ||
                 (roundedX !== this.oldRoundedX) ||
                 (roundedY !== this.oldRoundedY)
             ) {
@@ -107,7 +137,7 @@
                     y: roundedY
                 }]);
             }
-            if (! this.locked) {
+            if (!this.locked) {
                 this.emit('locked');
             }
             this.locked = true;
@@ -120,7 +150,7 @@
         this.emit('done');
     };
 
-    Tracker.prototype.setTrackingCoords = function (x, y) {
+    Tracker.prototype.setTrackingCoords = function(x, y) {
         this.locked = false;
 
         // translate from (stretched) canvas to framebuffer dimensions:
@@ -130,7 +160,7 @@
         this.enable();
     };
 
-    Tracker.prototype.trackFlow = function (frameBuffer) {
+    Tracker.prototype.trackFlow = function(frameBuffer) {
         this.newPyramid.data[0].data.set(frameBuffer);
 
         jsfeat.imgproc.equalize_histogram(
@@ -144,22 +174,22 @@
             this.oldPyramid, this.newPyramid,
             this.oldXY, this.newXY,
             1,
-            50,                // win_size
-            30,                // max_iterations
+            50, // win_size
+            30, // max_iterations
             this.point_status,
-            0.01,              // epsilon,
-            0.001              // min_eigen
+            0.01, // epsilon,
+            0.001 // min_eigen
         );
     };
 
-    Tracker.prototype.enable = function () {
+    Tracker.prototype.enable = function() {
         var tracker = this;
         if (this.enabled) {
             return;
         }
         this.enabled = true;
 
-        if (! this.cockpit.videostream) {
+        if (!this.cockpit.videostream) {
             console.error('The Tracker plugin depends on plugin video-stream');
             return;
         }
@@ -169,20 +199,22 @@
         this.on('done', this.hookNextFrame.bind(this));
     };
 
-    Tracker.prototype.disable = function () {
+    Tracker.prototype.disable = function() {
         this.enabled = false;
     };
 
-    Tracker.prototype.on = function (event, callback) {
-        var i = 0, handler;
+    Tracker.prototype.on = function(event, callback) {
+        var i = 0,
+            handler;
         if (!this.observers[event]) {
             this.observers[event] = [];
         }
         this.observers[event].push(callback);
     };
 
-    Tracker.prototype.emit = function (event, data) {
-        var i = 0, handler;
+    Tracker.prototype.emit = function(event, data) {
+        var i = 0,
+            handler;
         if (this.observers[event]) {
             for (i = 0; handler = this.observers[event][i]; ++i) {
                 handler(data);
@@ -190,7 +222,7 @@
         }
     };
 
-    Tracker.prototype.hookNextFrame = function () {
+    Tracker.prototype.hookNextFrame = function() {
         this.cockpit.videostream.onNextFrame(this.update.bind(this));
 
     };

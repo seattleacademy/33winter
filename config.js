@@ -5,6 +5,8 @@ var config = {
           , "hud"           // Display the artificial horizon, altimeter, compass, etc.
           , "battery"       // Display a simple battery widget in the header bar
           , "pilot"         // Pilot the drone with the keyboard
+          , "tracker"       // track pixels in webflight
+          , "test"
         ],
 
         // Config for pilot plugin
