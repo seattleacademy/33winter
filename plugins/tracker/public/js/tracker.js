@@ -44,33 +44,65 @@
         var cCenter = 0;
         this.on('points', function(data) {
             //console.log("data", data[0].x, tracker.canvas.clientWidth);
-            var cCenter = tracker.canvas.clientWidth/2;
-            var gap = cCenter/40;
-            var newspeed = Math.abs(cCenter - data[0].x)/cCenter;
-            console.log("speed", newspeed, "gap", gap);
-            if (data[0].x < (cCenter - gap)) {
+            var hCenter = tracker.canvas.clientWidth / 2;
+            var hgap = hCenter / 40;
+            var newspeed = Math.abs(hCenter - data[0].x) / hCenter;
+            console.log("speed", newspeed, "gap", hgap);
+            if (data[0].x < (hCenter - hgap)) {
                 console.log("turn left");
                 tracker.cockpit.socket.emit("/pilot/move", {
                     action: 'counterClockwise',
                     speed: newspeed
                 });
             } else
-            if (data[0].x > cCenter + gap) {
+            if (data[0].x > hCenter + hgap) {
                 console.log("turn right");
                 tracker.cockpit.socket.emit("/pilot/move", {
                     action: 'clockwise',
                     speed: newspeed
                 });
             } else {
-                tracker.cockpit.socket.emit("/pilot/drone", {
-                    action: 'stop'
-                });
-                console.log("don't move");
+                // tracker.cockpit.socket.emit("/pilot/drone", {
+                //     action: 'stop'
+                // });
+                // console.log("don't move");
             }
             tracker.crosshairs.style.left = (data[0].x - 83) + 'px';
             tracker.crosshairs.style.top = (data[0].y - 83) + 'px';
             tracker.crosshairs.style.display = 'block';
         });
+
+
+
+
+        this.on('points', function(data) {
+            //console.log("data", data[0].y, tracker.canvas.clientHeight);
+            var vCenter = tracker.canvas.clientHeight / 2;
+            var vgap = vCenter / 40;
+            var newspeed = Math.abs(vCenter - data[0].y) / vCenter;
+            console.log("speed", newspeed, "gap", vgap);
+            if (data[0].y < (vCenter - vgap)) {
+                console.log("ascend");
+                tracker.cockpit.socket.emit("/pilot/move", {
+                    action: 'up',
+                    speed: newspeed
+                });
+            } else
+            if (data[0].y > vCenter + vgap) {
+                console.log("descend");
+                tracker.cockpit.socket.emit("/pilot/move", {
+                    action: 'down',
+                    speed: newspeed
+                });
+            } else {
+                // tracker.cockpit.socket.emit("/pilot/drone", {
+                //     action: 'stop'
+                // });
+                // console.log("don't move");
+            }
+
+        });
+
 
         this.on('locked', function() {
             console.log('target acquired');
